@@ -1,144 +1,134 @@
 program nonlinfit
-implicit none
+  implicit none
 
-double precision, parameter :: PI = 3.14159265359d0
+  double precision, parameter :: PI = 3.14159265359d0
 
-double precision, dimension(:), allocatable :: x, y, sig
-double precision, dimension(2) :: da, a, anew, dchi2, beta
-double precision, dimension(2,2) :: hess
-double precision :: lambda, chi2cur, chi2new
+  double precision, dimension(:), allocatable :: x, y, sig
+  double precision, dimension(2) :: da, a, anew, dchi2, beta
+  double precision, dimension(2,2) :: hess
+  double precision :: lambda, chi2cur, chi2new, yk, eps
 
-integer n, i, j, k, nprm
-integer cnt, maxit, c1, c2, ok
-integer :: pivot(2)
+  integer n, i, j, k, nprm, info
+  integer cnt, maxit, c1, c2, ok
+  integer :: pivot(2)
 
-interface
-function chi2(x, y, sig, n, a, nprm)
-double precision :: chi2
-double precision, dimension(:), intent(in) :: x, y, sig
-integer, intent(in) :: n, nprm
-double precision, dimension(:), intent(in) :: a
-end function chi2
-end interface
+  interface
+    function chi2(x, y, sig, n, a, nprm)
+      double precision :: chi2
+      double precision, dimension(:), intent(in) :: x, y, sig
+      integer, intent(in) :: n, nprm
+      double precision, dimension(:), intent(in) :: a
+    end function chi2
+    subroutine dyda(x, a, nsize, res)
+      implicit none
+      double precision :: x
+      double precision, dimension(:), intent(in) :: a
+      integer, intent(in) :: nsize
+      double precision, dimension(nsize), intent(out) :: res
+    end subroutine dyda
+  end interface
 
-read(*,*)n
+  ! Read the number of data points from standard input
+  read(*,*)n
 
-if ( n < 2) then
-        write(0,*) 'Bad number of records = ',n
-        stop
-end if
+  if ( n < 2) then
+    write(0,*) 'Bad number of records = ',n
+    stop
+  end if
 
-a(1) = 195.e0
-a(2) = 40.e0
+  ! Initialiaztion of fit parameters
+  ! a(1) -> mu
+  a(1) = 195.e0
+  ! a(2) -> sig
+  a(2) = 45.e0
 
-nprm = 2
+  ! Number of fit parameters
+  nprm = 2
 
-allocate(x(n))
-allocate(y(n))
-allocate(sig(n))
+  ! Allocate data arrays
+  allocate(x(n))
+  allocate(y(n))
+  allocate(sig(n))
 
-do i = 1, n
-        read(*,*)x(i),y(i)
-        sig(i) = 1.e0
-end do
+  ! Read the expected data points from standard input
+  do i = 1, n
+    read(*,*)x(i),y(i)
+    sig(i) = 1.e0
+  end do
 
-chi2cur = chi2(x, y, sig, n, a, nprm)
+  chi2cur = chi2(x, y, sig, n, a, nprm)
 
-lambda = 1.d-5
-cnt = 0
-maxit = 5
+  lambda = 1.d-5
+  eps = 1.d-5
+  cnt = 0
+  maxit = 15 
+  beta(:) = 0.d0
 
-do while ( cnt < maxit)
-        cnt = cnt + 1
-        !calc the hess matrix
-        do j = 1, nprm
-                
-                do i = 1, nprm
-                        hess(i,j) = 0.d0
-                        
-                end do
-        end do
+  ! Main iteration loop
+  write(0,'(I3,4E20.7)')cnt,(a(j),j=1, nprm)
+  do 
+    !calc the hess matrix
+    do j = 1, nprm
+      do i = 1, nprm
+          !hess(i,j)  = 
+      end do
+    end do
 
-end do
+    call dgesv(nprm,1,hess, nprm,pivot, beta, nprm, info) 
+    if ((cnt > maxit).or.(sqrt(dot_product(beta, beta)).lt.eps)) exit
+    cnt = cnt + 1
+    a(:) = a(:) + beta(:) 
+    write(0,'(I3,4E20.7)')cnt,(a(j),j=1, nprm)
+  end do
 
 
-deallocate(x)
-deallocate(y)
-deallocate(sig)
-
-
+  deallocate(x)
+  deallocate(y)
+  deallocate(sig)
 end program nonlinfit
 
 function chi2(x, y, sig, n, a, nprm)
-double precision :: chi2
-double precision, dimension(:), intent(in) :: x, y, sig
-integer, intent(in) :: n, nprm
-double precision, dimension(:), intent(in) :: a
+  double precision :: chi2
+  double precision, dimension(:), intent(in) :: x, y, sig
+  integer, intent(in) :: n, nprm
+  double precision, dimension(:), intent(in) :: a
 
-double precision, dimension(:), allocatable :: dy, res
+  double precision, dimension(:), allocatable :: dy, res
 
-double precision :: mu, sigg
-!interface
-!elemental function func(x, a, n) result(res)
-!double precision :: res
+  double precision :: mu, sigg
 
-!double precision, intent(in) :: x
-!double precision, dimension(:), intent(in) ::  a
-!integer, intent(in) :: n
-!end function
-!end interface
+  allocate(dy(n))
+  allocate(res(n))
 
-allocate(dy(n))
-allocate(res(n))
+  mu = a(1)
+  sigg = a(2)
 
-mu = a(1)
-sigg = a(2)
+  res = exp( -(x - mu)**2/(2*sigg**2) ) / (sigg * sqrt(2*PI))
 
-res = exp( -(x - mu)**2/(2*sigg**2) ) / (sigg * sqrt(2*PI))
+  dy(:) = y(:) - res
 
-dy(:) = y(:) - res
+  chi2 = sum(dy(:) * dy(:) / sig(:) * sig(:) )
 
-chi2 = sum(dy(:) * dy(:) / sig(:) * sig(:) )
-
-deallocate(dy)
-deallocate(res)
-
+  deallocate(dy)
+  deallocate(res)
 end function chi2
 
-!elemental function func(x, a, n) result(res)
-!double precision :: res
-
-!double precision, intent(in) :: x
-!double precision, dimension(:), intent(in) ::  a
-!integer, intent(in) :: n
-
-
-
-!double precision :: mu, sig
-!double precision, parameter :: PI = 3.14159265359d0
-
-!mu = a(1)
-!sig = a(2)
-
-!res = exp( -(x - mu)**2/(2*sig**2) ) / (sig * sqrt(2*PI))
-
-!end function func
-
 subroutine dyda(x, a, nsize, res)
-double precision :: x
-double precision, dimension(:), intent(in) :: a
-integer, intent(in) :: nsize
-double precision, dimension(nsize), intent(out) :: res
+  implicit none
+  double precision :: x
+  double precision, dimension(:), intent(in) :: a
+  integer, intent(in) :: nsize
+  double precision, dimension(nsize), intent(out) :: res
 
-double precision :: mu, sig
+  double precision :: mu, sigg, fnc
+  double precision, parameter :: PI = 3.14159265359d0
 
-res(:) = 0.d0
-mu  = a(1)
-sigg = a(2)
+  res(:) = 0.d0
+  mu  = a(1)
+  sigg = a(2)
 
-res = exp( -(x - mu)**2/(2*sigg**2) ) / (sigg * sqrt(2*PI))
+  fnc = exp( -(x - mu)**2/(2*sigg**2) ) / (sigg * sqrt(2*PI))
 
-res(1) = sum((x - mu) * res / sigg ** 2)
-res(2) = - sum(( 1 + (mu - x) ** 2 / sig ** 2) * res / sigg)
-
+  res(1) = (x - mu) * fnc / sigg ** 2
+  res(2) = fnc * ((mu - x) ** 2 - sigg ** 2) / sigg ** 3
 end subroutine dyda
