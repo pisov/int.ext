@@ -8,7 +8,7 @@ OBJ=$(SRC:.f90=.o)
 all: $(SRC) $(EXE)
 
 $(EXE): $(OBJ)
-	$(FC) $(LDFLAGS) $(OBJ) -o $(EXE)
+	$(FC) $(OBJ) -o $(EXE) $(LDFLAGS)
 
 
 %.o: %.f90 
